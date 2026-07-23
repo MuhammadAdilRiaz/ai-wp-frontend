@@ -22,4 +22,5 @@ export const api = {
   getHistory:  (siteId, t)      => apiFetch(`/api/chat/history?site_id=${siteId}`, {}, t),
   getCredits:  (t)              => apiFetch('/api/credits', {}, t),
   getPackages: ()               => apiFetch('/api/credits/packages'),
+  oauthCallback: (code) => apiFetch('/api/auth/oauth-callback', { method:'POST', body:JSON.stringify({code}) }),
 }
