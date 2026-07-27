@@ -5,50 +5,105 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: #5271ff22; color: #2b45e8; }
+/* ── Lovable exact gradient ─────────────────────────────────────────────── */
+.hero-gradient {
+  position: relative;
+  background: #fff;
+  overflow: hidden;
+}
 
+/* Layer 1 — base solid color */
+.hero-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #e9e3f5;
+  z-index: 0;
+}
+
+/* Layer 2 — the colorful blobs */
+.hero-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    /* white bright center-top */
+    radial-gradient(ellipse 55% 40% at 50% 0%,   #ffffff 0%, transparent 70%),
+    /* blue left */
+    radial-gradient(ellipse 55% 65% at -5% 40%,  #4f6ef7 0%, #7c9ff5 30%, transparent 70%),
+    /* purple center */
+    radial-gradient(ellipse 70% 60% at 50% 55%,  #b87fef 0%, #c99cf5 40%, transparent 70%),
+    /* hot pink bottom-right */
+    radial-gradient(ellipse 60% 55% at 100% 80%,  #f03a8a 0%, #e8578c 30%, transparent 65%),
+    /* pink bottom-left */
+    radial-gradient(ellipse 50% 45% at 0% 90%,   #d94f9e 0%, transparent 60%),
+    /* magenta bottom-center */
+    radial-gradient(ellipse 80% 40% at 50% 100%, #e8458a 0%, #f06090 30%, transparent 65%);
+  animation: blobShift 8s ease-in-out infinite alternate;
+}
+
+@keyframes blobShift {
+  0% {
+    background:
+      radial-gradient(ellipse 55% 40% at 50% 0%,   #ffffff 0%, transparent 70%),
+      radial-gradient(ellipse 55% 65% at -5% 40%,  #4f6ef7 0%, #7c9ff5 30%, transparent 70%),
+      radial-gradient(ellipse 70% 60% at 50% 55%,  #b87fef 0%, #c99cf5 40%, transparent 70%),
+      radial-gradient(ellipse 60% 55% at 100% 80%, #f03a8a 0%, #e8578c 30%, transparent 65%),
+      radial-gradient(ellipse 50% 45% at 0% 90%,   #d94f9e 0%, transparent 60%),
+      radial-gradient(ellipse 80% 40% at 50% 100%, #e8458a 0%, #f06090 30%, transparent 65%);
+  }
+  50% {
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 0%,   #ffffff 0%, transparent 70%),
+      radial-gradient(ellipse 60% 70% at -5% 35%,  #3d5ef5 0%, #6b8ff3 30%, transparent 70%),
+      radial-gradient(ellipse 75% 65% at 55% 55%,  #a06de8 0%, #bb8cf2 40%, transparent 70%),
+      radial-gradient(ellipse 65% 60% at 105% 75%, #ee2d80 0%, #e04d85 30%, transparent 65%),
+      radial-gradient(ellipse 55% 50% at 0% 95%,   #cc3d94 0%, transparent 60%),
+      radial-gradient(ellipse 85% 45% at 50% 105%, #e03580 0%, #ef5585 30%, transparent 65%);
+  }
+  100% {
+    background:
+      radial-gradient(ellipse 50% 38% at 50% 0%,   #ffffff 0%, transparent 70%),
+      radial-gradient(ellipse 52% 62% at -5% 45%,  #5878fa 0%, #849ef7 30%, transparent 70%),
+      radial-gradient(ellipse 68% 58% at 48% 52%,  #bf88f3 0%, #d0a5f7 40%, transparent 70%),
+      radial-gradient(ellipse 58% 52% at 100% 82%, #f24090 0%, #ea6098 30%, transparent 65%),
+      radial-gradient(ellipse 48% 43% at 2% 88%,   #e060aa 0%, transparent 60%),
+      radial-gradient(ellipse 78% 38% at 50% 100%, #eb5090 0%, #f57090 30%, transparent 65%);
+  }
+}
+
+.hero-gradient > * { position: relative; z-index: 2; }
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 999px; }
 
-/* Animated mesh gradient for hero */
-.mesh-bg {
-  background-color: #fff;
-  background-image:
-    radial-gradient(at 0% 0%,   #dbeafe88 0px, transparent 55%),
-    radial-gradient(at 100% 0%,  #ede9fe88 0px, transparent 55%),
-    radial-gradient(at 50% 100%, #fce7f388 0px, transparent 55%);
-  animation: meshShift 12s ease-in-out infinite alternate;
+/* ── Animations ─────────────────────────────────────────────────────────── */
+@keyframes bounce {
+  0%,60%,100% { transform: translateY(0); }
+  30%         { transform: translateY(-6px); }
 }
-
-@keyframes meshShift {
-  0%   { background-position: 0% 0%, 100% 0%, 50% 100%; }
-  100% { background-position: 10% 10%, 90% 10%, 50% 90%; }
+@keyframes slideInTop {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-/* Message animations */
-.msg-enter { animation: msgIn 0.22s ease forwards; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes msgIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Typing indicator dots */
-.dot { width: 7px; height: 7px; border-radius: 50%; background: #a1a1aa; animation: bounce 1.2s infinite; }
-.dot:nth-child(2) { animation-delay: 0.15s; }
-.dot:nth-child(3) { animation-delay: 0.3s; }
-@keyframes bounce {
-  0%,60%,100% { transform: translateY(0); }
-  30% { transform: translateY(-6px); }
-}
-
-/* Action result card pulse */
-.action-card { animation: cardIn 0.3s ease forwards; }
-@keyframes cardIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
-}
+.fade-up           { animation: fadeUp 0.5s ease forwards; }
+.fade-up-delay-1   { animation: fadeUp 0.5s 0.08s ease both; }
+.fade-up-delay-2   { animation: fadeUp 0.5s 0.18s ease both; }
+.fade-up-delay-3   { animation: fadeUp 0.5s 0.28s ease both; }
+.msg-enter         { animation: msgIn 0.22s ease forwards; }
