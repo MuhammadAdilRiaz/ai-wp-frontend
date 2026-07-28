@@ -2,7 +2,7 @@ import Sidebar from '@/components/Sidebar'
 import DashboardHero from '@/components/DashboardHero'
 
 export const metadata = {
-  title: 'Dashboard — AI WP Builder',
+  title: 'Dashboard AI WP Builder',
 }
 
 export default function DashboardPage() {
