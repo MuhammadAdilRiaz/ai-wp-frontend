@@ -1,7 +1,7 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'AI WP Builder — Build WordPress with AI',
+  title: 'AI WP Builder Build WordPress with AI',
   description: 'Build beautiful WordPress websites by chatting with AI. Builds real Elementor pages instantly.',
 }
 
