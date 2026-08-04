@@ -30,6 +30,9 @@ function Icon({ name }) {
     case 'mail': return <svg {...props}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 6l10 7 10-7" /></svg>
     case 'panel': return <svg {...props}><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="9" y1="4" x2="9" y2="20" /></svg>
     case 'chevron': return <svg {...props}><polyline points="6 9 12 15 18 9" /></svg>
+    // add to the Icon() switch:
+case 'globe': return <svg {...props}><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z" /></svg>
+case 'plus': return <svg {...props}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
     default: return null
   }
 }
