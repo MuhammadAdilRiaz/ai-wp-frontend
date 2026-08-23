@@ -1,8 +1,8 @@
-// File: C:\Users\Computer Arena\wp clone\ai-wp-frontend\src\app\auth\page.js
-import * as entry from '../../../../src/app/auth/page.js'
+// File: C:\Users\Computer Arena\wp clone\ai-wp-frontend\src\app\pricing\page.js
+import * as entry from '../../../../src/app/pricing/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
-type TEntry = typeof import('../../../../src/app/auth/page.js')
+type TEntry = typeof import('../../../../src/app/pricing/page.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{

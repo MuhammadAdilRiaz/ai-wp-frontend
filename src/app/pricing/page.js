@@ -1,80 +1,45 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import { api } from '@/lib/api'
 
-const PLANS = [
-  {
-    name: 'Free',
-    tagline: 'Discover what AI WP Builder can do for you',
-    monthly: 0,
-    yearly: 0,
-    cta: 'Get started',
-    ctaStyle: 'outline',
-    note: 'No credit card needed',
-    credits: '10 monthly AI credits',
+// Marketing copy only — price, credits, and trial length all come from
+// GET /api/credits/plans (src/lib/plans.js on the backend), never hardcoded
+// here. If you change a price or credit allotment, change it in ONE place:
+// the backend's src/lib/plans.js, and this page picks it up automatically.
+const PLAN_COPY = {
+  starter: {
+    tagline: 'Get your first WordPress site live with AI',
     features: [
-      'Workspace-private projects',
-      'Unlimited collaborators',
-      '1 published WordPress site',
+      'Unlimited published WordPress sites',
       'Elementor page generation',
-      'Community support',
-    ],
-  },
-  {
-    name: 'Pro',
-    tagline: 'Designed for builders shipping real sites',
-    monthly: 25,
-    yearly: 20,
-    cta: 'Get started',
-    ctaStyle: 'filled',
-    highlight: true,
-    credits: '100 monthly AI credits',
-    features: [
-      'All Free features',
-      'Credit rollovers',
-      'On-demand credit top-ups',
-      'Unlimited published sites',
-      'Custom domains',
-      'Remove the AI WP Builder badge',
+      'Claude + GPT-5.6 model routing',
       'Email support',
     ],
   },
-  {
-    name: 'Business',
-    tagline: 'Advanced controls for growing teams',
-    monthly: 50,
-    yearly: 40,
-    cta: 'Get started',
-    ctaStyle: 'outline',
-    credits: '250 monthly AI credits',
+  pro: {
+    tagline: 'For builders shipping real client sites',
+    highlight: true,
     features: [
-      'All Pro features',
-      'Team workspace',
-      'Role-based access',
-      'Internal publish',
-      'Security center',
+      'Everything in Starter',
+      'Much higher monthly credit ceiling',
+      'Priority processing',
+      'Priority email support',
+    ],
+  },
+  business: {
+    tagline: 'Highest capacity, best model for complex builds',
+    features: [
+      'Everything in Pro',
+      'Claude Opus for complex page builds',
+      'Highest monthly credit ceiling',
       'Priority support',
     ],
   },
-  {
-    name: 'Enterprise',
-    tagline: 'Built for agencies needing scale & governance',
-    monthly: null,
-    yearly: null,
-    cta: 'Book a demo',
-    ctaStyle: 'outline',
-    credits: 'Volume based pricing',
-    features: [
-      'All Business features',
-      'Volume-based credit pricing',
-      'Dedicated support',
-      'Onboarding services',
-      'White-label sites',
-      'Audit logs',
-    ],
-  },
-]
+}
+const PLAN_ORDER = ['starter', 'pro', 'business']
 
 const FAQS = [
   {
@@ -83,19 +48,19 @@ const FAQS = [
   },
   {
     q: 'What is a credit?',
-    a: 'A credit is used each time you ask the AI to generate or modify a page, section, or design element on your site.',
+    a: 'A credit is used each time you send the AI a message that reads or changes your site — the exact amount depends on how much work the message takes.',
   },
   {
-    q: 'Do credits expire?',
-    a: 'Monthly credits reset each billing cycle. On the Pro plan, unused credits roll over for up to one month.',
+    q: 'Do I need a credit card to try it?',
+    a: 'No — every account starts with a 7-day free trial, no card required. Pick a plan any time during or after your trial to keep building.',
+  },
+  {
+    q: 'Do credits roll over?',
+    a: "No. Your plan's credit allotment resets at the start of each billing cycle — unused credits don't carry over.",
   },
   {
     q: 'What happens to my credits if my subscription ends?',
-    a: 'Any unused credits expire at the end of your current billing period once your subscription ends.',
-  },
-  {
-    q: 'Do you charge per seat or per user?',
-    a: 'No. Pro, Business, and Enterprise plans include unlimited team members at no extra cost.',
+    a: 'Once a subscription ends, remaining credits are cleared and you\'ll need to resubscribe to keep building.',
   },
   {
     q: 'Who owns the projects and code?',
@@ -123,8 +88,62 @@ function ChevronIcon({ open }) {
 }
 
 export default function PricingPage() {
+  const router = useRouter()
   const [yearly, setYearly] = useState(false)
   const [openFaq, setOpenFaq] = useState(null)
+  const [catalog, setCatalog] = useState(null)   // GET /api/credits/plans
+  const [billing, setBilling] = useState(null)   // GET /api/credits — only if logged in
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [checkingOutPlan, setCheckingOutPlan] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const plansRes = await api.getPlans()
+        if (cancelled) return
+        setCatalog(plansRes)
+
+        const token = typeof window !== 'undefined' ? localStorage.getItem('aiwpb_token') : null
+        if (token) {
+          try {
+            const creditsRes = await api.getCredits(token)
+            if (!cancelled) setBilling(creditsRes)
+          } catch { /* not logged in or session expired — pricing page still works logged-out */ }
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Could not load pricing.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  async function handleChoosePlan(planId) {
+    const token = localStorage.getItem('aiwpb_token')
+    if (!token) {
+      router.push('/auth?next=/pricing')
+      return
+    }
+    setCheckingOutPlan(planId)
+    setError('')
+    try {
+      const { url } = await api.checkout(planId, yearly ? 'yearly' : 'monthly', token)
+      window.location.href = url
+    } catch (err) {
+      setError(err.message || 'Could not start checkout. Please try again.')
+      setCheckingOutPlan(null)
+    }
+  }
+
+  const currentPlan = billing?.plan
+  const hasActiveSubscription = ['starter', 'pro', 'business'].includes(currentPlan) && billing?.billing_status !== 'cancelled'
+  const plans = catalog?.plans
+    ? PLAN_ORDER.map(id => catalog.plans.find(p => p.id === id)).filter(Boolean)
+    : []
 
   return (
     <main>
@@ -147,7 +166,9 @@ export default function PricingPage() {
           </h1>
         </div>
         <p style={{ marginTop: 12, color: '#52525b', fontSize: 16 }}>
-          Start for free. Upgrade to get the AI capacity that matches your workflow.
+          {catalog?.trial
+            ? `Every plan starts with a ${catalog.trial.days}-day free trial. No credit card required.`
+            : 'Pick the plan that matches your workflow.'}
         </p>
 
         {/* Toggle */}
@@ -179,110 +200,128 @@ export default function PricingPage() {
             }}
           >
             Yearly
-            <span style={{ color: '#a855f7', fontWeight: 700 }}>2 months free</span>
+            <span style={{ color: '#a855f7', fontWeight: 700 }}>save $48/yr</span>
           </button>
         </div>
       </section>
+
+      {error && (
+        <div style={{ maxWidth: 480, margin: '0 auto 24px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#991b1b', fontSize: 13, textAlign: 'center' }}>
+          {error}
+        </div>
+      )}
 
       {/* Plan cards */}
-      <section style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px 40px' }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 16,
-        }}>
-          {PLANS.map(plan => (
-            <div
-              key={plan.name}
-              style={{
-                border: plan.highlight ? '2px solid #a855f7' : '1px solid #e4e4e7',
-                borderRadius: 16,
-                padding: 24,
-                background: '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-              }}
-            >
-              {plan.highlight && (
-                <span style={{
-                  position: 'absolute', top: -12, left: 24,
-                  background: '#a855f7', color: '#fff', fontSize: 12, fontWeight: 700,
-                  padding: '4px 10px', borderRadius: 999,
-                }}>
-                  Most popular
-                </span>
-              )}
+      <section style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px 40px' }}>
+        {loading ? (
+          <p style={{ textAlign: 'center', color: '#71717a', fontSize: 14 }}>Loading plans...</p>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 16,
+          }}>
+            {plans.map(plan => {
+              const copy = PLAN_COPY[plan.id] || {}
+              const isCurrent = currentPlan === plan.id && billing?.billing_status !== 'cancelled'
+              const priceToShow = yearly ? plan.annual_monthly_equivalent_usd : plan.monthly_price_usd
+              const isCheckingOut = checkingOutPlan === plan.id
 
-              <h3 style={{ fontSize: 19, fontWeight: 700, color: '#18181b', margin: 0 }}>{plan.name}</h3>
-              <p style={{ fontSize: 13, color: '#71717a', marginTop: 6, minHeight: 34 }}>{plan.tagline}</p>
+              let ctaLabel = `Choose ${plan.label}`
+              let ctaAction = () => handleChoosePlan(plan.id)
+              let ctaDisabled = false
 
-              <div style={{ marginTop: 16, display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                {plan.monthly === null ? (
-                  <span style={{ fontSize: 26, fontWeight: 700, color: '#18181b' }}>Platform fee</span>
-                ) : (
-                  <>
+              if (isCurrent) {
+                ctaLabel = 'Current plan'
+                ctaDisabled = true
+              } else if (hasActiveSubscription) {
+                // Already on a different paid plan — send to the Stripe
+                // portal for proration instead of starting a second
+                // subscription through Checkout.
+                ctaLabel = 'Manage billing to switch'
+                ctaAction = () => router.push('/account')
+              } else if (isCheckingOut) {
+                ctaLabel = 'Redirecting…'
+                ctaDisabled = true
+              }
+
+              return (
+                <div
+                  key={plan.id}
+                  style={{
+                    border: copy.highlight ? '2px solid #a855f7' : '1px solid #e4e4e7',
+                    borderRadius: 16,
+                    padding: 24,
+                    background: '#fff',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                  }}
+                >
+                  {copy.highlight && (
+                    <span style={{
+                      position: 'absolute', top: -12, left: 24,
+                      background: '#a855f7', color: '#fff', fontSize: 12, fontWeight: 700,
+                      padding: '4px 10px', borderRadius: 999,
+                    }}>
+                      Most popular
+                    </span>
+                  )}
+
+                  <h3 style={{ fontSize: 19, fontWeight: 700, color: '#18181b', margin: 0 }}>{plan.label}</h3>
+                  <p style={{ fontSize: 13, color: '#71717a', marginTop: 6, minHeight: 34 }}>{copy.tagline}</p>
+
+                  <div style={{ marginTop: 16, display: 'flex', alignItems: 'baseline', gap: 4 }}>
                     <span style={{ fontSize: 34, fontWeight: 700, color: '#18181b', letterSpacing: '-0.02em' }}>
-                      ${yearly ? plan.yearly : plan.monthly}
+                      ${priceToShow}
                     </span>
                     <span style={{ fontSize: 13, color: '#71717a' }}>/ month</span>
-                  </>
-                )}
-              </div>
-
-              <div style={{
-                marginTop: 12, fontSize: 13, color: '#3f3f46',
-                background: '#f4f4f5', borderRadius: 8, padding: '8px 12px',
-              }}>
-                {plan.credits}
-              </div>
-
-              <button style={{
-                marginTop: 18,
-                padding: '11px 0',
-                borderRadius: 10,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-                border: plan.ctaStyle === 'filled' ? 'none' : '1px solid #d4d4d8',
-                background: plan.ctaStyle === 'filled' ? '#a855f7' : '#fff',
-                color: plan.ctaStyle === 'filled' ? '#fff' : '#18181b',
-              }}>
-                {plan.cta}
-              </button>
-
-              <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {plan.features.map(f => (
-                  <div key={f} style={{ display: 'flex', gap: 8, fontSize: 13.5, color: '#3f3f46' }}>
-                    <CheckIcon />
-                    <span>{f}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+                  {yearly && (
+                    <p style={{ fontSize: 12, color: '#a1a1aa', margin: '2px 0 0' }}>
+                      billed ${plan.annual_price_usd}/yr
+                    </p>
+                  )}
 
-      {/* Security banner */}
-      <section style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px 56px' }}>
-        <div style={{
-          border: '1px solid #e4e4e7', borderRadius: 16, padding: '24px 28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
-        }}>
-          <div>
-            <h4 style={{ fontSize: 16, fontWeight: 700, color: '#18181b', margin: 0 }}>Security and compliance</h4>
-            <p style={{ fontSize: 13, color: '#71717a', marginTop: 4 }}>
-              Enterprise-grade security and compliance for every site you build.
-            </p>
+                  <div style={{
+                    marginTop: 12, fontSize: 13, color: '#3f3f46',
+                    background: '#f4f4f5', borderRadius: 8, padding: '8px 12px',
+                  }}>
+                    {plan.display_credits_monthly.toLocaleString()} monthly AI credits
+                  </div>
+
+                  <button
+                    onClick={ctaAction}
+                    disabled={ctaDisabled}
+                    style={{
+                      marginTop: 18,
+                      padding: '11px 0',
+                      borderRadius: 10,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: ctaDisabled ? 'default' : 'pointer',
+                      border: copy.highlight && !isCurrent ? 'none' : '1px solid #d4d4d8',
+                      background: isCurrent ? '#f4f4f5' : (copy.highlight ? '#a855f7' : '#fff'),
+                      color: isCurrent ? '#71717a' : (copy.highlight ? '#fff' : '#18181b'),
+                      opacity: ctaDisabled && !isCurrent ? 0.6 : 1,
+                    }}
+                  >
+                    {ctaLabel}
+                  </button>
+
+                  <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(copy.features || []).map(f => (
+                      <div key={f} style={{ display: 'flex', gap: 8, fontSize: 13.5, color: '#3f3f46' }}>
+                        <CheckIcon />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          <button style={{
-            padding: '10px 20px', borderRadius: 10, border: '1px solid #d4d4d8',
-            background: '#fff', fontSize: 14, fontWeight: 600, color: '#18181b', cursor: 'pointer',
-          }}>
-            Learn more
-          </button>
-        </div>
+        )}
       </section>
 
       {/* FAQ */}

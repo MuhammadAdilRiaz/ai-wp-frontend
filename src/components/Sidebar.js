@@ -37,7 +37,15 @@ function Icon({ name }) {
   }
 }
 
-export default function Sidebar({ user = {}, sites = [], sitesLoading = false, onAddSiteClick }) {
+const PLAN_LABELS = { trial: 'Trial', starter: 'Starter', pro: 'Pro', business: 'Business', cancelled: 'Cancelled' }
+
+function daysLeft(isoDate) {
+  if (!isoDate) return null
+  const ms = new Date(isoDate).getTime() - Date.now()
+  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
+}
+
+export default function Sidebar({ user = {}, sites = [], sitesLoading = false, onAddSiteClick, billing = null }) {
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const wrapRef = useRef(null)
   const router  = useRouter()
@@ -88,7 +96,7 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
           </span>
           <span style={{ color:'#a1a1aa' }}><Icon name="chevron"/></span>
         </button>
-        {switcherOpen && <WorkspaceSwitcher user={user} onClose={() => setSwitcherOpen(false)} />}
+        {switcherOpen && <WorkspaceSwitcher user={user} billing={billing} router={router} />}
       </div>
 
       {/* Nav items */}
@@ -148,19 +156,14 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
         </div>
       </div>
 
-      {/* Upgrade card */}
-      <div style={{ border:'1px solid #e4e4e7', borderRadius:12, padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
-        <span style={{ width:26, height:26, borderRadius:8, background:'#f4f4f5', display:'flex', alignItems:'center', justifyContent:'center', color:'#18181b', flexShrink:0 }}>
-          <Icon name="bolt"/>
-        </span>
-        <div>
-          <p style={{ fontSize:13, fontWeight:600, color:'#18181b', margin:0 }}>Upgrade to Pro</p>
-          <p style={{ fontSize:11.5, color:'#71717a', margin:0 }}>Unlock more features</p>
-        </div>
-      </div>
+      {/* Plan status card — trial countdown, low-credit or payment warning, or just plan name */}
+      <PlanStatusCard billing={billing} router={router} />
 
       {/* Profile */}
-      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 6px 0', borderTop:'1px solid #e4e4e7' }}>
+      <div
+        onClick={() => router.push('/account')}
+        style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 6px 0', borderTop:'1px solid #e4e4e7', cursor:'pointer' }}
+      >
         <div style={{ position:'relative', flexShrink:0 }}>
           <div style={{ width:28, height:28, borderRadius:'50%', background:'#dbeafe', color:'#1d4ed8', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}>
             {user.initial || '?'}
@@ -170,7 +173,7 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
         <span style={{ fontSize:12.5, color:'#52525b', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
           {user.email}
         </span>
-        <button onClick={logout} title="Log out" style={{ background:'none', border:'none', cursor:'pointer', color:'#a1a1aa', padding:2 }}>
+        <button onClick={(e) => { e.stopPropagation(); logout() }} title="Log out" style={{ background:'none', border:'none', cursor:'pointer', color:'#a1a1aa', padding:2 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
@@ -178,7 +181,68 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
   )
 }
 
-function WorkspaceSwitcher({ user }) {
+// Trial countdown, low-credit/payment warning, or plan summary — replaces
+// the old static "Upgrade to Pro" card with real data from GET /api/credits.
+function PlanStatusCard({ billing, router }) {
+  if (!billing) return null
+  const { plan, trial_ends_at, billing_status, credits } = billing
+  const left = plan === 'trial' ? daysLeft(trial_ends_at) : null
+
+  if (plan === 'trial') {
+    return (
+      <div onClick={() => router.push('/pricing')} style={{ border:'1px solid #fed7aa', background:'#fff7ed', borderRadius:12, padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+        <span style={{ width:26, height:26, borderRadius:8, background:'#ffedd5', display:'flex', alignItems:'center', justifyContent:'center', color:'#ea580c', flexShrink:0 }}>
+          <Icon name="bolt"/>
+        </span>
+        <div style={{ flex:1 }}>
+          <p style={{ fontSize:13, fontWeight:600, color:'#18181b', margin:0 }}>
+            {left === 0 ? 'Trial ends today' : `${left} day${left === 1 ? '' : 's'} left in trial`}
+          </p>
+          <p style={{ fontSize:11.5, color:'#9a3412', margin:0 }}>Buy now to keep building</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (plan === 'cancelled') {
+    return (
+      <div onClick={() => router.push('/pricing')} style={{ border:'1px solid #fecaca', background:'#fef2f2', borderRadius:12, padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+        <div>
+          <p style={{ fontSize:13, fontWeight:600, color:'#991b1b', margin:0 }}>Subscription ended</p>
+          <p style={{ fontSize:11.5, color:'#b91c1c', margin:0 }}>Resubscribe to keep building</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (billing_status === 'past_due') {
+    return (
+      <div onClick={() => router.push('/account')} style={{ border:'1px solid #fecaca', background:'#fef2f2', borderRadius:12, padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+        <div>
+          <p style={{ fontSize:13, fontWeight:600, color:'#991b1b', margin:0 }}>Payment failed</p>
+          <p style={{ fontSize:11.5, color:'#b91c1c', margin:0 }}>Update your card to keep your plan</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={() => router.push('/account')} style={{ border:'1px solid #e4e4e7', borderRadius:12, padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+      <span style={{ width:26, height:26, borderRadius:8, background:'#f4f4f5', display:'flex', alignItems:'center', justifyContent:'center', color:'#18181b', flexShrink:0 }}>
+        <Icon name="bolt"/>
+      </span>
+      <div>
+        <p style={{ fontSize:13, fontWeight:600, color:'#18181b', margin:0 }}>{PLAN_LABELS[plan] || plan} plan</p>
+        <p style={{ fontSize:11.5, color:'#71717a', margin:0 }}>{credits} credits left · Manage billing</p>
+      </div>
+    </div>
+  )
+}
+
+function WorkspaceSwitcher({ user, billing, router }) {
+  const plan = billing?.plan
+  const planLabel = PLAN_LABELS[plan] || 'Trial'
+  const isTrialOrCancelled = plan === 'trial' || plan === 'cancelled' || !plan
   return (
     <div style={{ position:'absolute', top:'110%', left:0, width:280, background:'#fff', border:'1px solid #e4e4e7', borderRadius:16, boxShadow:'0 12px 32px rgba(0,0,0,0.12)', padding:14, zIndex:30 }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
@@ -187,14 +251,17 @@ function WorkspaceSwitcher({ user }) {
         </div>
         <div>
           <p style={{ fontSize:13.5, fontWeight:700, color:'#18181b', margin:0 }}>{user.name}'s AI WP</p>
-          <p style={{ fontSize:12, color:'#71717a', margin:0 }}>Free Plan · 1 member</p>
+          <p style={{ fontSize:12, color:'#71717a', margin:0 }}>{planLabel} Plan · 1 member</p>
         </div>
       </div>
       <div style={{ borderTop:'1px solid #f0f0f0', paddingTop:8 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 4px' }}>
-          <span style={{ fontSize:13, color:'#3f3f46' }}>Turn Pro</span>
-          <button style={{ padding:'5px 12px', borderRadius:999, border:'none', cursor:'pointer', background:'#e9d5ff', color:'#7e22ce', fontSize:12, fontWeight:700 }}>
-            Upgrade
+          <span style={{ fontSize:13, color:'#3f3f46' }}>{isTrialOrCancelled ? 'Choose a plan' : 'Manage billing'}</span>
+          <button
+            onClick={() => router.push(isTrialOrCancelled ? '/pricing' : '/account')}
+            style={{ padding:'5px 12px', borderRadius:999, border:'none', cursor:'pointer', background:'#e9d5ff', color:'#7e22ce', fontSize:12, fontWeight:700 }}
+          >
+            {isTrialOrCancelled ? 'Upgrade' : 'Manage'}
           </button>
         </div>
       </div>
