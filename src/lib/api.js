@@ -13,6 +13,7 @@ export const api = {
   signup:      (e, p)           => apiFetch('/api/auth/signup',  { method:'POST', body:JSON.stringify({email:e,password:p}) }),
   login:       (e, p)           => apiFetch('/api/auth/login',   { method:'POST', body:JSON.stringify({email:e,password:p}) }),
   me:          (t)              => apiFetch('/api/auth/me', {}, t),
+  updateProfile: (name, t)      => apiFetch('/api/auth/me', { method:'PATCH', body:JSON.stringify({name}) }, t),
   oauthUrl:    (provider)       => apiFetch(`/api/auth/oauth-url?provider=${provider}`),
   getSites:    (t)              => apiFetch('/api/sites', {}, t),
   connectSite: (url, tok, t)    => apiFetch('/api/sites/connect', { method:'POST', body:JSON.stringify({site_url:url,site_token:tok}) }, t),
@@ -21,6 +22,8 @@ export const api = {
     apiFetch('/api/chat/message', { method:'POST', body:JSON.stringify({site_id:siteId,message:msg,history}) }, t),
   getHistory:  (siteId, t)      => apiFetch(`/api/chat/history?site_id=${siteId}`, {}, t),
   getCredits:  (t)              => apiFetch('/api/credits', {}, t),
-  getPackages: ()               => apiFetch('/api/credits/packages'),
+  getPlans:    ()               => apiFetch('/api/credits/plans'),
+  billingPortal: (t)            => apiFetch('/api/billing/portal', { method:'POST' }, t),
+  checkout:    (planId, cycle, t) => apiFetch('/api/billing/checkout', { method:'POST', body:JSON.stringify({plan_id:planId, billing_cycle:cycle}) }, t),
   oauthCallback: (code) => apiFetch('/api/auth/oauth-callback', { method:'POST', body:JSON.stringify({code}) }),
 }
