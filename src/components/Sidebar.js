@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: 'home' },
@@ -10,10 +10,14 @@ const NAV_ITEMS = [
   { label: 'Connectors',href: '#',          icon: 'plug' },
 ]
 
+// All projects / Starred are real, filtered views of the same dashboard
+// (see ProjectsGrid). "Created by me" has no backend meaning yet in a
+// single-user app — every site IS created by you — so it stays inert until
+// there's an actual multi-user/team concept to filter by.
 const PROJECT_ITEMS = [
-  { label: 'All projects',  icon: 'grid' },
-  { label: 'Starred',       icon: 'star' },
-  { label: 'Created by me', icon: 'user' },
+  { label: 'All projects',  icon: 'grid', href: '/dashboard' },
+  { label: 'Starred',       icon: 'star', href: '/dashboard?filter=starred' },
+  { label: 'Created by me', icon: 'user', href: '#' },
 ]
 
 function Icon({ name }) {
@@ -25,6 +29,7 @@ function Icon({ name }) {
     case 'plug':    return <svg {...p}><path d="M9 2v6M15 2v6M6 8h12l-1 5a5 5 0 01-10 0L6 8z"/><path d="M12 17v5"/></svg>
     case 'grid':    return <svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
     case 'star':    return <svg {...p}><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg>
+    case 'starFilled': return <svg {...p} fill="currentColor"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg>
     case 'user':    return <svg {...p}><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
     case 'gift':    return <svg {...p}><rect x="3" y="8" width="18" height="13" rx="1"/><path d="M12 8v13M3 12h18M12 8c-1.5 0-3-1-3-2.5S10.5 3 12 4c1.5-1 3 0 3 1.5S13.5 8 12 8z"/></svg>
     case 'bolt':    return <svg {...p} fill="currentColor" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -45,10 +50,28 @@ function daysLeft(isoDate) {
   return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
 }
 
+const COLLAPSE_KEY = 'aiwpb_sidebar_collapsed'
+
 export default function Sidebar({ user = {}, sites = [], sitesLoading = false, onAddSiteClick, billing = null }) {
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const wrapRef = useRef(null)
   const router  = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const activeFilter = searchParams.get('filter')
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem(COLLAPSE_KEY) === '1')
+  }, [])
+
+  function toggleCollapsed() {
+    setCollapsed(c => {
+      const next = !c
+      localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0')
+      return next
+    })
+  }
 
   useEffect(() => {
     function handleClick(e) {
@@ -63,6 +86,69 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
     router.push('/')
   }
 
+  function isActive(href) {
+    if (href === '#') return false
+    const [path, query] = href.split('?')
+    if (path !== pathname) return false
+    if (query) return activeFilter === new URLSearchParams(query).get('filter')
+    return !activeFilter
+  }
+
+  // ── Collapsed rail — icons only, matches the minimized reference screenshot ──
+  if (collapsed) {
+    return (
+      <aside style={{
+        width: 64, minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', borderRight: '1px solid #e4e4e7', background: '#fff',
+        padding: '16px 8px', boxSizing: 'border-box', flexShrink: 0, gap: 4,
+      }}>
+        <div style={{ width:28, height:28, borderRadius:8, background:'linear-gradient(135deg,#f97316,#ec4899)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:10 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
+        <button onClick={toggleCollapsed} title="Expand sidebar" style={{ background:'none', border:'none', cursor:'pointer', color:'#71717a', padding:8, marginBottom:6 }}>
+          <Icon name="panel"/>
+        </button>
+
+        {NAV_ITEMS.map(item => (
+          <Link key={item.label} href={item.href} title={item.label} style={{
+            display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:8,
+            color: isActive(item.href) ? '#18181b' : '#71717a',
+            background: isActive(item.href) ? '#f4f4f5' : 'transparent',
+          }}>
+            <Icon name={item.icon}/>
+          </Link>
+        ))}
+
+        <div style={{ height:1, width:28, background:'#e4e4e7', margin:'8px 0' }}/>
+
+        {PROJECT_ITEMS.map(item => (
+          <Link key={item.label} href={item.href} title={item.label} style={{
+            display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:8,
+            color: isActive(item.href) ? '#18181b' : '#71717a',
+            background: isActive(item.href) ? '#f4f4f5' : 'transparent',
+          }}>
+            <Icon name={item.icon}/>
+          </Link>
+        ))}
+
+        <button onClick={onAddSiteClick} title="Add your website" style={{ display:'flex', alignItems:'center', justifyContent:'center', width:36, height:36, borderRadius:8, background:'none', border:'1px dashed #d4d4d8', cursor:'pointer', color:'#71717a', marginTop:6 }}>
+          <Icon name="plus"/>
+        </button>
+
+        <div style={{ flex:1 }}/>
+
+        <button onClick={() => router.push('/account')} title={user.email} style={{ background:'none', border:'none', cursor:'pointer', padding:0, marginBottom:8 }}>
+          <div style={{ width:30, height:30, borderRadius:'50%', background:'#dbeafe', color:'#1d4ed8', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}>
+            {user.initial || '?'}
+          </div>
+        </button>
+      </aside>
+    )
+  }
+
+  // ── Expanded sidebar (default) ────────────────────────────────────────────
   return (
     <aside style={{
       width: 260, minHeight: '100vh', display: 'flex', flexDirection: 'column',
@@ -77,7 +163,7 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
         </div>
-        <button style={{ background:'none', border:'none', cursor:'pointer', color:'#71717a', padding:4 }}>
+        <button onClick={toggleCollapsed} title="Collapse sidebar" style={{ background:'none', border:'none', cursor:'pointer', color:'#71717a', padding:4 }}>
           <Icon name="panel"/>
         </button>
       </div>
@@ -102,7 +188,12 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
       {/* Nav items */}
       <nav style={{ display:'flex', flexDirection:'column', gap:2, marginBottom:20 }}>
         {NAV_ITEMS.map(item => (
-          <Link key={item.label} href={item.href} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, textDecoration:'none', color:'#3f3f46', fontSize:13.5, fontWeight:500 }}>
+          <Link key={item.label} href={item.href} style={{
+            display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, textDecoration:'none',
+            color: isActive(item.href) ? '#18181b' : '#3f3f46',
+            background: isActive(item.href) ? '#f4f4f5' : 'transparent',
+            fontSize:13.5, fontWeight:500,
+          }}>
             <Icon name={item.icon}/>
             <span style={{ flex:1 }}>{item.label}</span>
             {item.shortcut && <span style={{ fontSize:11, color:'#a1a1aa' }}>{item.shortcut}</span>}
@@ -114,10 +205,15 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
       <div style={{ marginBottom:16 }}>
         <p style={{ fontSize:12, color:'#a1a1aa', padding:'0 10px', marginBottom:6 }}>Projects</p>
         {PROJECT_ITEMS.map(item => (
-          <a key={item.label} href="#" style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, textDecoration:'none', color:'#3f3f46', fontSize:13.5, fontWeight:500 }}>
+          <Link key={item.label} href={item.href} style={{
+            display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, textDecoration:'none',
+            color: isActive(item.href) ? '#18181b' : '#3f3f46',
+            background: isActive(item.href) ? '#f4f4f5' : 'transparent',
+            fontSize:13.5, fontWeight:500,
+          }}>
             <Icon name={item.icon}/>
             <span>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </div>
 

@@ -1,14 +1,23 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import DashboardHero from '@/components/DashboardHero'
+import ProjectsGrid from '@/components/ProjectsGrid'
+import AddWebsiteModal from '@/components/AddWebsiteModal'
 import { api } from '@/lib/api'
 
-export default function DashboardPage() {
+function DashboardInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const filter = searchParams.get('filter') // 'starred' | null
+
   const [user, setUser] = useState(null)
   const [credits, setCredits] = useState(0)
+  const [billing, setBilling] = useState(null)
+  const [sites, setSites] = useState([])
+  const [sitesLoading, setSitesLoading] = useState(true)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -23,19 +32,23 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const [meRes, creditsRes] = await Promise.all([
+        const [meRes, creditsRes, sitesRes] = await Promise.all([
           api.me(token),
           api.getCredits(token),
+          api.getSites(token),
         ])
         if (cancelled) return
 
         const u = meRes.user || meRes
+        const storedName = meRes.profile?.name || ''
         setUser({
-          name: u.name || u.email?.split('@')[0] || 'there',
+          name: storedName || u.email?.split('@')[0] || 'there',
           email: u.email,
-          initial: (u.name || u.email || '?')[0].toUpperCase(),
+          initial: (storedName || u.email || '?')[0].toUpperCase(),
         })
         setCredits(creditsRes.credits ?? creditsRes.balance ?? 0)
+        setBilling(creditsRes)
+        setSites(sitesRes.sites || [])
 
         // keep the cached copy fresh for anything else reading aiwpb_user
         localStorage.setItem('aiwpb_user', JSON.stringify(u))
@@ -50,13 +63,17 @@ export default function DashboardPage() {
         }
         setError(msg || 'Failed to load dashboard')
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) { setLoading(false); setSitesLoading(false) }
       }
     }
 
     load()
     return () => { cancelled = true }
   }, [router])
+
+  function handleSiteConnected(site) {
+    setSites(prev => [site, ...prev.filter(s => s.id !== site.id)])
+  }
 
   if (loading) {
     return (
@@ -76,10 +93,39 @@ export default function DashboardPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar user={user} />
-      <main style={{ flex: 1, minWidth: 0 }}>
+      <Sidebar
+        user={user}
+        billing={billing}
+        sites={sites}
+        sitesLoading={sitesLoading}
+        onAddSiteClick={() => setShowAddModal(true)}
+      />
+      <main style={{ flex: 1, minWidth: 0, background: '#fafafa' }}>
         <DashboardHero user={user} credits={credits} />
+        <ProjectsGrid
+          sites={sites}
+          sitesLoading={sitesLoading}
+          onAddSiteClick={() => setShowAddModal(true)}
+          onSitesChange={setSites}
+          filter={filter}
+        />
       </main>
+      {showAddModal && (
+        <AddWebsiteModal
+          onClose={() => setShowAddModal(false)}
+          onConnected={handleSiteConnected}
+        />
+      )}
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  // Sidebar reads the URL's ?filter= param (useSearchParams), which Next.js
+  // requires to be wrapped in Suspense even in a fully client-rendered page.
+  return (
+    <Suspense fallback={null}>
+      <DashboardInner />
+    </Suspense>
   )
 }
