@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { api } from '@/lib/api'
@@ -19,7 +19,7 @@ const row = { display:'flex', alignItems:'center', justifyContent:'space-between
 const btn = { padding:'8px 16px', borderRadius:8, border:'1px solid #d4d4d8', background:'#fff', color:'#18181b', fontSize:13, fontWeight:600, cursor:'pointer' }
 const btnPrimary = { ...btn, border:'none', background:'#18181b', color:'#fff' }
 
-export default function AccountPage() {
+function AccountPageInner() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [billing, setBilling] = useState(null)
@@ -27,6 +27,9 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
   const [error, setError] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [savingName, setSavingName] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('aiwpb_token')
@@ -40,12 +43,15 @@ export default function AccountPage() {
         ])
         if (cancelled) return
         const u = meRes.user || meRes
+        const storedName = meRes.profile?.name || ''
         setUser({
-          name: u.name || u.email?.split('@')[0] || 'there',
+          name: storedName || u.email?.split('@')[0] || 'there',
+          hasName: !!storedName,
           email: u.email,
-          initial: (u.name || u.email || '?')[0].toUpperCase(),
+          initial: (storedName || u.email || '?')[0].toUpperCase(),
           created_at: meRes.profile?.created_at || u.created_at,
         })
+        setNameInput(storedName)
         setBilling(creditsRes)
         setPlanCatalog(plansRes)
       } catch (err) {
@@ -63,6 +69,23 @@ export default function AccountPage() {
     load()
     return () => { cancelled = true }
   }, [router])
+
+  async function saveName() {
+    const trimmed = nameInput.trim()
+    if (!trimmed) return
+    const token = localStorage.getItem('aiwpb_token')
+    setSavingName(true)
+    setError('')
+    try {
+      const { profile } = await api.updateProfile(trimmed, token)
+      setUser(u => ({ ...u, name: profile?.name || trimmed, hasName: true, initial: (profile?.name || trimmed)[0].toUpperCase() }))
+      setEditingName(false)
+    } catch (err) {
+      setError(err.message || 'Could not update name')
+    } finally {
+      setSavingName(false)
+    }
+  }
 
   async function openBillingPortal() {
     const token = localStorage.getItem('aiwpb_token')
@@ -113,11 +136,35 @@ export default function AccountPage() {
           <div style={row}>
             <div>
               <p style={{ ...label, fontSize:13 }}>Avatar</p>
-              <p style={sub}>Generated from your email.</p>
+              <p style={sub}>Generated from your name (or email if unset).</p>
             </div>
             <div style={{ width:40, height:40, borderRadius:'50%', background:'#dbeafe', color:'#1d4ed8', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:700 }}>
               {user.initial}
             </div>
+          </div>
+          <div style={row}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <p style={{ ...label, fontSize:13 }}>Name</p>
+              {!editingName && <p style={sub}>{user.hasName ? user.name : 'Not set — click Edit to add one'}</p>}
+            </div>
+            {editingName ? (
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <input
+                  value={nameInput}
+                  onChange={e => setNameInput(e.target.value)}
+                  maxLength={80}
+                  autoFocus
+                  style={{ padding:'7px 10px', borderRadius:8, border:'1px solid #d4d4d8', fontSize:13, width:180 }}
+                  onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false) }}
+                />
+                <button onClick={saveName} disabled={savingName || !nameInput.trim()} style={btnPrimary}>
+                  {savingName ? 'Saving…' : 'Save'}
+                </button>
+                <button onClick={() => { setEditingName(false); setNameInput(user.hasName ? user.name : '') }} style={btn}>Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setEditingName(true)} style={btn}>Edit</button>
+            )}
           </div>
           <div style={row}>
             <div>
@@ -193,5 +240,15 @@ export default function AccountPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function AccountPage() {
+  // Sidebar reads the URL (useSearchParams), which Next.js requires to be
+  // wrapped in Suspense even in a fully client-rendered page.
+  return (
+    <Suspense fallback={null}>
+      <AccountPageInner />
+    </Suspense>
   )
 }
