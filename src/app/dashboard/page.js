@@ -101,7 +101,7 @@ function DashboardInner() {
         onAddSiteClick={() => setShowAddModal(true)}
       />
       <main style={{ flex: 1, minWidth: 0, background: '#fafafa' }}>
-        <DashboardHero user={user} credits={credits} />
+        <DashboardHero user={user} credits={credits} sites={sites} onAddSiteClick={() => setShowAddModal(true)} />
         <ProjectsGrid
           sites={sites}
           sitesLoading={sitesLoading}

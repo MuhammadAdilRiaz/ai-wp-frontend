@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 const EXAMPLES = [
@@ -9,12 +10,24 @@ const EXAMPLES = [
   'Create a contact form page',
 ]
 
-export default function DashboardHero({ user, credits }) {
+export default function DashboardHero({ user, credits, sites = [], onAddSiteClick }) {
   const router = useRouter()
+  const [value, setValue] = useState('')
 
+  // Chat always needs a site to build on — there's no sandbox to spin up
+  // out of thin air, only your real connected WordPress sites. With exactly
+  // one connected, use it automatically. With none, send them to connect
+  // one first instead of 404ing. With more than one, default to the most
+  // recently updated (sites is already sorted that way by the backend) —
+  // worth a proper picker later if multi-site turns out to be common.
   function startChat(prompt) {
+    if (!prompt.trim()) return
+    if (sites.length === 0) {
+      onAddSiteClick?.()
+      return
+    }
     sessionStorage.setItem('pending_prompt', prompt)
-    router.push('/dashboard/chat')
+    router.push(`/chat?site=${sites[0].id}`)
   }
 
   return (
@@ -39,23 +52,29 @@ export default function DashboardHero({ user, credits }) {
         <h2 style={{ fontSize:36, fontWeight:800, color:'#18181b', letterSpacing:'-0.02em', marginBottom:8 }}>
           What's the vision, {user?.name || 'there'}?
         </h2>
-        <p style={{ fontSize:16, color:'#71717a', marginBottom:36 }}>
+        <p style={{ fontSize:16, color:'#71717a', marginBottom:8 }}>
           Describe what you want to build on your WordPress site
         </p>
+        {sites.length === 0 && (
+          <p style={{ fontSize:13, color:'#ea580c', marginBottom:28 }}>
+            Connect your website first — click "Add your website" in the sidebar.
+          </p>
+        )}
 
         {/* Prompt box */}
-        <div style={{ width:'100%', maxWidth:640, background:'#fff', border:'1.5px solid #e4e4e7', borderRadius:18, boxShadow:'0 4px 24px rgba(0,0,0,0.06)', overflow:'hidden', marginBottom:16 }}
+        <div style={{ width:'100%', maxWidth:640, background:'#fff', border:'1.5px solid #e4e4e7', borderRadius:18, boxShadow:'0 4px 24px rgba(0,0,0,0.06)', overflow:'hidden', marginBottom:16, marginTop: sites.length === 0 ? 0 : 28 }}
           onFocusCapture={e => e.currentTarget.style.borderColor = '#5271ff'}
           onBlurCapture={e => e.currentTarget.style.borderColor = '#e4e4e7'}
         >
           <textarea
+            value={value}
+            onChange={e => setValue(e.target.value)}
             placeholder="Ask AI WP Builder to build..."
             rows={3}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
-                const val = e.target.value.trim()
-                if (val) startChat(val)
+                startChat(value)
               }
             }}
             style={{ width:'100%', border:'none', outline:'none', padding:'18px 20px 10px', fontSize:15, color:'#18181b', background:'transparent', resize:'none', fontFamily:'inherit', lineHeight:1.5, boxSizing:'border-box' }}
@@ -63,8 +82,9 @@ export default function DashboardHero({ user, credits }) {
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px 14px' }}>
             <span style={{ fontSize:12, color:'#a1a1aa' }}>Enter to build · Shift+Enter new line</span>
             <button
-              onClick={() => router.push('/dashboard/chat')}
-              style={{ background:'#18181b', color:'#fff', border:'none', borderRadius:10, padding:'8px 18px', fontSize:13, fontWeight:500, cursor:'pointer', fontFamily:'inherit' }}
+              onClick={() => startChat(value)}
+              disabled={!value.trim()}
+              style={{ background:'#18181b', color:'#fff', border:'none', borderRadius:10, padding:'8px 18px', fontSize:13, fontWeight:500, cursor:'pointer', fontFamily:'inherit', opacity: value.trim() ? 1 : 0.5 }}
             >
               Build →
             </button>

@@ -322,6 +322,25 @@ function PlanStatusCard({ billing, router }) {
     )
   }
 
+  if (!['starter','pro','business'].includes(plan)) {
+    // Safety net: any plan value we don't recognize (a stale 'free' row from
+    // before the pricing redesign, a null, anything unexpected) is treated
+    // as "hasn't subscribed" rather than assumed to be a paying customer —
+    // showing "Manage billing" for someone with no Stripe customer is what
+    // causes the confusing "No billing account yet" error.
+    return (
+      <div onClick={() => router.push('/pricing')} style={{ border:'1px solid #e4e4e7', borderRadius:12, padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+        <span style={{ width:26, height:26, borderRadius:8, background:'#f4f4f5', display:'flex', alignItems:'center', justifyContent:'center', color:'#18181b', flexShrink:0 }}>
+          <Icon name="bolt"/>
+        </span>
+        <div>
+          <p style={{ fontSize:13, fontWeight:600, color:'#18181b', margin:0 }}>Choose a plan</p>
+          <p style={{ fontSize:11.5, color:'#71717a', margin:0 }}>Pick Starter, Pro, or Business</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div onClick={() => router.push('/account')} style={{ border:'1px solid #e4e4e7', borderRadius:12, padding:12, marginBottom:16, display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
       <span style={{ width:26, height:26, borderRadius:8, background:'#f4f4f5', display:'flex', alignItems:'center', justifyContent:'center', color:'#18181b', flexShrink:0 }}>
@@ -338,7 +357,7 @@ function PlanStatusCard({ billing, router }) {
 function WorkspaceSwitcher({ user, billing, router }) {
   const plan = billing?.plan
   const planLabel = PLAN_LABELS[plan] || 'Trial'
-  const isTrialOrCancelled = plan === 'trial' || plan === 'cancelled' || !plan
+  const isPaidPlan = ['starter','pro','business'].includes(plan)
   return (
     <div style={{ position:'absolute', top:'110%', left:0, width:280, background:'#fff', border:'1px solid #e4e4e7', borderRadius:16, boxShadow:'0 12px 32px rgba(0,0,0,0.12)', padding:14, zIndex:30 }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
@@ -352,12 +371,12 @@ function WorkspaceSwitcher({ user, billing, router }) {
       </div>
       <div style={{ borderTop:'1px solid #f0f0f0', paddingTop:8 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 4px' }}>
-          <span style={{ fontSize:13, color:'#3f3f46' }}>{isTrialOrCancelled ? 'Choose a plan' : 'Manage billing'}</span>
+          <span style={{ fontSize:13, color:'#3f3f46' }}>{!isPaidPlan ? 'Choose a plan' : 'Manage billing'}</span>
           <button
-            onClick={() => router.push(isTrialOrCancelled ? '/pricing' : '/account')}
+            onClick={() => router.push(!isPaidPlan ? '/pricing' : '/account')}
             style={{ padding:'5px 12px', borderRadius:999, border:'none', cursor:'pointer', background:'#e9d5ff', color:'#7e22ce', fontSize:12, fontWeight:700 }}
           >
-            {isTrialOrCancelled ? 'Upgrade' : 'Manage'}
+            {!isPaidPlan ? 'Upgrade' : 'Manage'}
           </button>
         </div>
       </div>

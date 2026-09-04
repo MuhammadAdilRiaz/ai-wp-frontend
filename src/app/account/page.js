@@ -114,7 +114,7 @@ function AccountPageInner() {
     : planInfo?.display_credits_monthly
   const usedPct = monthlyAllotment ? Math.min(100, Math.round((1 - billing.credits / monthlyAllotment) * 100)) : null
   const left = plan === 'trial' ? daysLeft(billing.trial_ends_at) : null
-  const canManageBilling = !!billing?.billing_cycle && plan !== 'trial' // has been through checkout at least once
+  const canManageBilling = ['starter','pro','business'].includes(plan) // only true once they've actually subscribed
   const isPaidActive = ['starter','pro','business'].includes(plan)
 
   return (

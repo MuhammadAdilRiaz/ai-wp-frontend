@@ -101,7 +101,7 @@ export default function ProjectsGrid({ sites = [], sitesLoading = false, onAddSi
           {filtered.map(site => (
             <div
               key={site.id}
-              onClick={() => router.push(`/dashboard/chat?site=${site.id}`)}
+              onClick={() => router.push(`/chat?site=${site.id}`)}
               style={{ borderRadius:14, border:'1px solid #e4e4e7', overflow:'hidden', background:'#fff', cursor:'pointer' }}
             >
               <div style={{ height:110, background:gradientFor(site.site_name || site.site_url), position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}>
