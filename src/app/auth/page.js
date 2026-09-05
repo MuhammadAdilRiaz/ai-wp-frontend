@@ -19,6 +19,7 @@ function AuthForm() {
     try {
       const data = mode==='signup' ? await api.signup(email,pw) : await api.login(email,pw)
       localStorage.setItem('aiwpb_token', data.session.access_token)
+      localStorage.setItem('aiwpb_refresh_token', data.session.refresh_token)
       localStorage.setItem('aiwpb_user', JSON.stringify(data.user))
       const next = params.get('next') || '/dashboard'
       router.push(next)

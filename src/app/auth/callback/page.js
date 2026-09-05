@@ -21,6 +21,7 @@ function CallbackHandler() {
     api.oauthCallback(code)
       .then(data => {
         localStorage.setItem('aiwpb_token', data.session.access_token)
+        localStorage.setItem('aiwpb_refresh_token', data.session.refresh_token)
         localStorage.setItem('aiwpb_user', JSON.stringify(data.user))
         router.push('/dashboard')
       })
