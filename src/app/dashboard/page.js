@@ -6,6 +6,7 @@ import DashboardHero from '@/components/DashboardHero'
 import ProjectsGrid from '@/components/ProjectsGrid'
 import AddWebsiteModal from '@/components/AddWebsiteModal'
 import { api } from '@/lib/api'
+import { getToken, clearSession, redirectToLogin } from '@/lib/auth'
 
 function DashboardInner() {
   const router = useRouter()
@@ -22,9 +23,11 @@ function DashboardInner() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const token = localStorage.getItem('aiwpb_token')
+    // getToken() returns null once the 7-day cap is up, so an expired
+    // session is caught here instead of after three failed API calls.
+    const token = getToken()
     if (!token) {
-      router.replace('/auth?next=/dashboard')
+      redirectToLogin('/dashboard')
       return
     }
 
@@ -54,14 +57,15 @@ function DashboardInner() {
         localStorage.setItem('aiwpb_user', JSON.stringify(u))
       } catch (err) {
         if (cancelled) return
-        const msg = err.message || ''
-        if (msg.includes('401') || /unauthor/i.test(msg)) {
-          localStorage.removeItem('aiwpb_token')
-          localStorage.removeItem('aiwpb_user')
-          router.replace('/auth?next=/dashboard')
+        // Was sniffing for the string "401" inside the message, which meant a
+        // 500 mentioning 401 signed you out and a real 401 that didn't spell
+        // it out did not. The status code is the fact; use it.
+        if (err?.status === 401) {
+          clearSession()
+          redirectToLogin('/dashboard')
           return
         }
-        setError(msg || 'Failed to load dashboard')
+        setError(err?.message || 'Failed to load dashboard')
       } finally {
         if (!cancelled) { setLoading(false); setSitesLoading(false) }
       }

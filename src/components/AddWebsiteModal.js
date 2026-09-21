@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { api } from '@/lib/api'
+import { getToken } from '@/lib/auth'
 
 export default function AddWebsiteModal({ onClose, onConnected }) {
   const [url, setUrl] = useState('')
@@ -14,7 +15,7 @@ export default function AddWebsiteModal({ onClose, onConnected }) {
     setLoading(true)
     setError('')
     try {
-      const authToken = localStorage.getItem('aiwpb_token')
+      const authToken = getToken()
       const { site } = await api.connectSite(url.trim(), token.trim(), authToken)
       onConnected(site)
       onClose()

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { api } from '@/lib/api'
+import { startNewSession } from '@/lib/auth'
 
 function CallbackHandler() {
   const router = useRouter()
@@ -10,7 +11,10 @@ function CallbackHandler() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const code = params.get('code')
+    const code  = params.get('code')
+    // The backend put this on the redirect URL and keyed the PKCE verifier by
+    // it; sending it back is what keeps two simultaneous logins apart.
+    const state = params.get('state')
 
     if (!code) {
       setError('No authorization code received.')
@@ -18,12 +22,10 @@ function CallbackHandler() {
       return
     }
 
-    api.oauthCallback(code)
+    api.oauthCallback(code, state)
       .then(data => {
-        localStorage.setItem('aiwpb_token', data.session.access_token)
-        localStorage.setItem('aiwpb_refresh_token', data.session.refresh_token)
-        localStorage.setItem('aiwpb_user', JSON.stringify(data.user))
-        router.push('/dashboard')
+        startNewSession(data.session, data.user, data.session_max_age_days)
+        router.replace('/dashboard')
       })
       .catch(err => {
         setError(err.message || 'Login failed. Please try again.')

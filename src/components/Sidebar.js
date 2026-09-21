@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { logout as endSession } from '@/lib/auth'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: 'home' },
@@ -81,9 +82,12 @@ export default function Sidebar({ user = {}, sites = [], sitesLoading = false, o
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  function logout() {
-    localStorage.clear()
-    router.push('/')
+  async function logout() {
+    // localStorage.clear() nuked unrelated keys and, worse, left the refresh
+    // token alive at Supabase — the session was still perfectly usable by
+    // anything that had a copy. endSession() revokes it server-side first.
+    await endSession()
+    router.replace('/')
   }
 
   function isActive(href) {

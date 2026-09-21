@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
+import { getToken } from '@/lib/auth'
 
 const GRADIENTS = [
   'linear-gradient(135deg,#18181b,#3f3f46)',
@@ -46,7 +47,7 @@ export default function ProjectsGrid({ sites = [], sitesLoading = false, onAddSi
     e.stopPropagation()
     setStarringId(site.id)
     try {
-      const token = localStorage.getItem('aiwpb_token')
+      const token = getToken()
       await api.starSite(site.id, !site.starred, token)
       onSitesChange(sites.map(s => s.id === site.id ? { ...s, starred: !s.starred } : s))
     } catch {

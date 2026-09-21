@@ -3,6 +3,7 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { api } from '@/lib/api'
+import { startNewSession } from '@/lib/auth'
 
 function AuthForm() {
   const router  = useRouter()
@@ -18,11 +19,11 @@ function AuthForm() {
     e.preventDefault(); setError(''); setLoading(true)
     try {
       const data = mode==='signup' ? await api.signup(email,pw) : await api.login(email,pw)
-      localStorage.setItem('aiwpb_token', data.session.access_token)
-      localStorage.setItem('aiwpb_refresh_token', data.session.refresh_token)
-      localStorage.setItem('aiwpb_user', JSON.stringify(data.user))
+      // startNewSession stamps the 7-day deadline. A later token refresh
+      // reuses that stamp rather than pushing it out.
+      startNewSession(data.session, data.user, data.session_max_age_days)
       const next = params.get('next') || '/dashboard'
-      router.push(next)
+      router.replace(next)
     } catch(err) { setError(err.message) }
     finally { setLoading(false) }
   }

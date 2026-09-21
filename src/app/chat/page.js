@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { api } from '@/lib/api'
+import { getToken, redirectToLogin } from '@/lib/auth'
 
 function ChatUI() {
   const router  = useRouter()
@@ -16,15 +17,23 @@ function ChatUI() {
   const [loading, setLoading]     = useState(true)
   const [imagePreview, setImagePreview] = useState(null)
   const [showUpgrade, setShowUpgrade]   = useState(false)
+  const [loadError, setLoadError]       = useState('')
+  const [sessionId, setSessionId]       = useState(null)
   const bottomRef = useRef(null)
   const fileRef   = useRef(null)
   const textRef   = useRef(null)
 
   useEffect(() => {
-    const token = localStorage.getItem('aiwpb_token')
-    if (!token || !siteId) { router.push('/dashboard'); return }
+    // Two different problems used to share one outcome here. No site id means
+    // "go pick a project"; no token means "sign in". Sending both to
+    // /dashboard made a genuinely signed-out user ping-pong between pages.
+    if (!siteId) { router.replace('/dashboard'); return }
+
+    const token = getToken()
+    if (!token) { redirectToLogin(`/chat?site=${siteId}`); return }
+
     init(token)
-  }, [])
+  }, [siteId])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages])
 
@@ -36,6 +45,7 @@ function ChatUI() {
       const found = sitesData.sites?.find(s => s.id === siteId)
       if (!found) { router.push('/dashboard'); return }
       setSite(found); setCredits(creditsData.credits || 0)
+      if (histData.session_id) setSessionId(histData.session_id)
       const hist = histData.history || []
       if (hist.length > 0) {
         setMessages(hist.map(h => ({ role:h.role, text:h.content, actions:h.metadata?.actions||[], results:h.metadata?.results||[] })))
@@ -44,24 +54,40 @@ function ChatUI() {
       }
       const pending = sessionStorage.getItem('pending_prompt')
       if (pending) { sessionStorage.removeItem('pending_prompt'); setInput(pending) }
-    } catch { router.push('/auth') }
+    } catch (err) {
+      // This used to be a bare `catch { router.push('/auth') }`, so ANY
+      // failure — a 400 from the history call's wrong query param, a network
+      // blip, a 500 — was reported to the user as "you need to log in". Only
+      // a real 401 is a sign-out now; everything else is shown as what it is.
+      if (err?.status === 401) {
+        redirectToLogin(`/chat?site=${siteId}`)
+        return
+      }
+      setLoadError(err?.message || 'Could not load this project. Please try again.')
+    }
     finally { setLoading(false) }
   }
 
   async function send() {
     if (!input.trim() || sending) return
-    const token = localStorage.getItem('aiwpb_token')
+    const token = getToken()
+    if (!token) { redirectToLogin(`/chat?site=${siteId}`); return }
     const userMsg = input.trim()
     setInput(''); setImagePreview(null); setSending(true)
     setMessages(p => [...p, { role:'user', text:userMsg, imagePreview }])
     const history = messages.slice(-10).map(m => ({ role:m.role, content:m.text }))
     try {
-      const data = await api.sendMessage(siteId, userMsg, history, token)
+      const data = await api.sendMessage(siteId, userMsg, history, token, sessionId)
+      // Keep every message of this conversation in one sidebar thread.
+      if (data.session_id) setSessionId(data.session_id)
       setCredits(data.credits_left || 0)
       setMessages(p => [...p, { role:'assistant', text:data.message, actions:data.actions||[], results:data.action_results||[], credits_used:data.credits_used }])
     } catch(err) {
-      if (err.message?.includes('credits')) { setShowUpgrade(true) }
-      setMessages(p => [...p, { role:'assistant', text:err.message?.includes('credits')?'You are out of credits. Please top up to continue.':`Error: ${err.message}`, actions:[], isError:true }])
+      // A 401 here means the session really is gone — bounce, don't paste
+      // "Error: ..." into the transcript as if the AI said it.
+      if (err?.status === 401) { redirectToLogin(`/chat?site=${siteId}`); return }
+      if (err?.status === 402) { setShowUpgrade(true) }
+      setMessages(p => [...p, { role:'assistant', text: err?.status === 402 ? 'You are out of credits. Please top up to continue.' : `Error: ${err.message}`, actions:[], isError:true }])
     } finally { setSending(false) }
   }
 
@@ -69,6 +95,16 @@ function ChatUI() {
   function onFile(e) { const f=e.target.files?.[0]; if(!f) return; setImagePreview(URL.createObjectURL(f)) }
 
   if (loading) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'#a1a1aa',fontSize:14}}>Loading chat...</div>
+
+  if (loadError) return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12,padding:24,textAlign:'center'}}>
+      <p style={{color:'#dc2626',fontSize:14,margin:0}}>{loadError}</p>
+      <div style={{display:'flex',gap:8}}>
+        <button onClick={()=>window.location.reload()} style={{background:'#18181b',color:'#fff',border:'none',borderRadius:10,padding:'9px 16px',fontSize:13,cursor:'pointer'}}>Try again</button>
+        <Link href="/dashboard" style={{border:'1px solid #e4e4e7',borderRadius:10,padding:'9px 16px',fontSize:13,color:'#71717a',textDecoration:'none'}}>Back to dashboard</Link>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',background:'#fafafa',fontFamily:'Inter,system-ui,sans-serif'}}>

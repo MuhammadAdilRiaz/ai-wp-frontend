@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { api } from '@/lib/api'
+import { getToken, clearSession, redirectToLogin } from '@/lib/auth'
 
 const PLAN_LABELS = { trial: 'Trial', starter: 'Starter', pro: 'Pro', business: 'Business', cancelled: 'Cancelled' }
 
@@ -32,8 +33,8 @@ function AccountPageInner() {
   const [savingName, setSavingName] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem('aiwpb_token')
-    if (!token) { router.replace('/auth?next=/account'); return }
+    const token = getToken()
+    if (!token) { redirectToLogin('/account'); return }
 
     let cancelled = false
     async function load() {
@@ -56,12 +57,12 @@ function AccountPageInner() {
         setPlanCatalog(plansRes)
       } catch (err) {
         if (cancelled) return
-        const msg = err.message || ''
-        if (msg.includes('401') || /unauthor/i.test(msg)) {
-          localStorage.removeItem('aiwpb_token'); localStorage.removeItem('aiwpb_user')
-          router.replace('/auth?next=/account'); return
+        if (err?.status === 401) {
+          clearSession()
+          redirectToLogin('/account')
+          return
         }
-        setError(msg || 'Failed to load account settings')
+        setError(err?.message || 'Failed to load account settings')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -73,7 +74,7 @@ function AccountPageInner() {
   async function saveName() {
     const trimmed = nameInput.trim()
     if (!trimmed) return
-    const token = localStorage.getItem('aiwpb_token')
+    const token = getToken()
     setSavingName(true)
     setError('')
     try {
@@ -88,7 +89,7 @@ function AccountPageInner() {
   }
 
   async function openBillingPortal() {
-    const token = localStorage.getItem('aiwpb_token')
+    const token = getToken()
     setPortalLoading(true)
     try {
       const { url } = await api.billingPortal(token)
