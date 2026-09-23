@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 export default function Navbar() {
   return (
-    <nav style={{
+    <nav className="site-nav" style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -32,17 +32,23 @@ export default function Navbar() {
       </Link>
 
       {/* Center links */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+      <div className="site-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
         <Link href="/pricing" style={{
           fontSize: 14, fontWeight: 500, color: '#3f3f46',
           textDecoration: 'none',
         }}>
           Pricing
         </Link>
+        <Link href="/download" style={{
+          fontSize: 14, fontWeight: 500, color: '#3f3f46',
+          textDecoration: 'none',
+        }}>
+          Download plugin
+        </Link>
       </div>
 
       {/* Right */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="site-nav-cta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Link href="/auth" style={{
           fontSize: 14, fontWeight: 500, color: '#3f3f46',
           textDecoration: 'none',
