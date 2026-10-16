@@ -129,6 +129,8 @@ function authed(path, options = {}) {
 }
 
 export const api = {
+  getTemplates: () => apiFetch('/api/templates'),
+  getTemplate: (slug) => apiFetch(`/api/templates/${encodeURIComponent(slug)}`),
   // ── auth ──────────────────────────────────────────────────────────────────
   signup: (email, password) =>
     apiFetch('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password }) }),
@@ -158,13 +160,21 @@ export const api = {
     apiFetch(`/api/sites/${id}`, { method: 'DELETE' }, t || getToken()),
   getSiteContext: (id, t) => apiFetch(`/api/sites/${id}/context`, {}, t || getToken()),
 
+  // Provider-neutral WordPress connector (OpenAI and Claude share these APIs).
+  getConnectorCapabilities: (t) => apiFetch('/api/sites/connector/capabilities', {}, t || getToken()),
+  inspectSite: (id, t) => apiFetch(`/api/sites/${encodeURIComponent(id)}/inspect`, {}, t || getToken()),
+  executeConnectorAction: (id, action, t) =>
+    apiFetch(`/api/sites/${encodeURIComponent(id)}/connector-action`, {
+      method: 'POST', body: JSON.stringify({ confirm: true, action }),
+    }, t || getToken()),
+
   // ── chat ──────────────────────────────────────────────────────────────────
   // session_id keeps a conversation in ONE sidebar thread. Without it the
   // backend started a brand-new session on every single message.
-  sendMessage: (siteId, msg, history, t, sessionId = null) =>
+  sendMessage: (siteId, msg, history, t, sessionId = null, image = null) =>
     apiFetch('/api/chat/message', {
       method: 'POST',
-      body: JSON.stringify({ site_id: siteId, message: msg, history, session_id: sessionId }),
+      body: JSON.stringify({ site_id: siteId, message: msg, history, session_id: sessionId, ...(image ? { image } : {}) }),
     }, t || getToken()),
   getSessions: (siteId, t) => apiFetch(`/api/chat/sessions?site_id=${siteId}`, {}, t || getToken()),
   // The backend wants session_id; this used to send site_id and get a 400 back,

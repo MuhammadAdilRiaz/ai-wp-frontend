@@ -39,9 +39,12 @@ export default function AddWebsiteModal({ onClose, onConnected }) {
           </button>
         </div>
         <p style={{ fontSize:13, color:'#71717a', margin:'0 0 20px' }}>
-          Install the AI WP Builder plugin on your site, then paste its URL and connection token below.
+          Install the Elimeni AI Connector plugin on your site, then paste its URL and connection token below.
         </p>
 
+        <div style={{background:'#f5f3ff',padding:12,borderRadius:10,marginBottom:14,fontSize:12,color:'#4338ca'}}>
+          <strong>Manual token connection</strong> — Your existing plugin token still works. <a href="/download" style={{color:'#4338ca',textDecoration:'underline'}}>Download connector plugin</a> if needed. Secure WordPress authorization will be available after the backend supports it.
+        </div>
         <form onSubmit={handleSubmit}>
           <label style={{ fontSize:12.5, fontWeight:600, color:'#3f3f46', display:'block', marginBottom:6 }}>Website URL</label>
           <input
@@ -53,6 +56,8 @@ export default function AddWebsiteModal({ onClose, onConnected }) {
 
           <label style={{ fontSize:12.5, fontWeight:600, color:'#3f3f46', display:'block', marginBottom:6 }}>Connection token</label>
           <input
+            type="password"
+            autoComplete="off"
             value={token}
             onChange={e => setToken(e.target.value)}
             placeholder="Paste the token from the plugin's settings page"

@@ -16,6 +16,13 @@ function ChatUI() {
   const [site, setSite]           = useState(null)
   const [loading, setLoading]     = useState(true)
   const [imagePreview, setImagePreview] = useState(null)
+  const [imageData, setImageData] = useState(null)
+  const [imageError, setImageError] = useState('')
+  const [inspectionOpen, setInspectionOpen] = useState(false)
+  const [inspection, setInspection] = useState(null)
+  const [inspectionError, setInspectionError] = useState('')
+  const [inspecting, setInspecting] = useState(false)
+  const [approving, setApproving] = useState('')
   const [showUpgrade, setShowUpgrade]   = useState(false)
   const [loadError, setLoadError]       = useState('')
   const [sessionId, setSessionId]       = useState(null)
@@ -73,11 +80,11 @@ function ChatUI() {
     const token = getToken()
     if (!token) { redirectToLogin(`/chat?site=${siteId}`); return }
     const userMsg = input.trim()
-    setInput(''); setImagePreview(null); setSending(true)
+    setInput(''); setImagePreview(null); setImageData(null); setImageError(''); setSending(true)
     setMessages(p => [...p, { role:'user', text:userMsg, imagePreview }])
     const history = messages.slice(-10).map(m => ({ role:m.role, content:m.text }))
     try {
-      const data = await api.sendMessage(siteId, userMsg, history, token, sessionId)
+      const data = await api.sendMessage(siteId, userMsg, history, token, sessionId, imageData)
       // Keep every message of this conversation in one sidebar thread.
       if (data.session_id) setSessionId(data.session_id)
       setCredits(data.credits_left || 0)
@@ -92,7 +99,41 @@ function ChatUI() {
   }
 
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send() } }
-  function onFile(e) { const f=e.target.files?.[0]; if(!f) return; setImagePreview(URL.createObjectURL(f)) }
+  function onFile(e) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setImageError('')
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(f.type) || f.size > 8 * 1024 * 1024) {
+      setImageError('Choose a JPG, PNG, WebP or GIF image up to 8 MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => { setImageData(reader.result); setImagePreview(reader.result) }
+    reader.onerror = () => setImageError('Could not read this image.')
+    reader.readAsDataURL(f)
+    e.target.value = ''
+  }
+
+  async function inspectCurrentSite() {
+    setInspectionOpen(true); setInspecting(true); setInspectionError('')
+    try {
+      const data = await api.inspectSite(siteId)
+      setInspection(data.context || data)
+    } catch (err) { setInspectionError(err.message || 'Inspection failed') }
+    finally { setInspecting(false) }
+  }
+
+  async function approveAction(action, key) {
+    if (!window.confirm(`Approve this WordPress action?\n\n${JSON.stringify(action, null, 2)}`)) return
+    setApproving(key)
+    try {
+      const result = await api.executeConnectorAction(siteId, action)
+      setMessages(prev => [...prev, { role:'assistant', text: result.success ? `WordPress confirmed: ${action.action}` : `Action failed: ${result.error || 'Unknown error'}`, actions:[], results:[result] }])
+      if (result.success) setInspection(null)
+    } catch (err) {
+      setMessages(prev => [...prev, { role:'assistant', text:`Action failed: ${err.message}`, isError:true, actions:[] }])
+    } finally { setApproving('') }
+  }
 
   if (loading) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'#a1a1aa',fontSize:14}}>Loading chat...</div>
 
@@ -119,7 +160,10 @@ function ChatUI() {
           </div>
           {site?.elementor && <span style={{fontSize:11,background:'#f5f3ff',color:'#7c3aed',padding:'3px 8px',borderRadius:999,fontWeight:500}}>⚡ Elementor</span>}
         </div>
-        <div style={{fontSize:12,color:'#71717a',background:'#f4f4f5',padding:'5px 12px',borderRadius:999}}>⚡ {credits} credits</div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button onClick={inspectCurrentSite} style={{border:'1px solid #d4d4d8',borderRadius:8,padding:'7px 10px',background:'#fff',cursor:'pointer',fontSize:12}}>Inspect website</button>
+          <div style={{fontSize:12,color:'#71717a',background:'#f4f4f5',padding:'5px 12px',borderRadius:999}}>⚡ {credits} credits</div>
+        </div>
       </div>
 
       {/* Messages */}
@@ -136,6 +180,14 @@ function ChatUI() {
                   {msg.results.map((r,j) => <ActionCard key={j} result={r}/>)}
                 </div>
               )}
+              {msg.actions?.filter(a => a && ['install_plugin','activate_plugin','install_theme','activate_theme','delete_page'].includes(a.action)).map((action,j) => {
+                const key = `${i}-${j}`
+                return <div key={key} style={{border:'1px solid #fde68a',background:'#fffbeb',borderRadius:12,padding:12,marginTop:8,fontSize:12,maxWidth:'82%'}}>
+                  <strong>Approval required: {action.action.replaceAll('_',' ')}</strong>
+                  <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:11}}>{JSON.stringify(action,null,2)}</pre>
+                  <button disabled={!!approving} onClick={()=>approveAction(action,key)} style={{padding:'7px 12px',borderRadius:8,border:0,background:'#18181b',color:'#fff',cursor:'pointer'}}>{approving===key?'Working...':'Review and approve'}</button>
+                </div>
+              })}
               {msg.credits_used && <div style={{fontSize:11,color:'#a1a1aa',marginTop:3}}>Used {msg.credits_used} credits</div>}
             </div>
           ))}
@@ -153,10 +205,11 @@ function ChatUI() {
       {/* Input */}
       <div style={{background:'#fff',borderTop:'1px solid #e4e4e7',padding:'14px 20px',flexShrink:0}}>
         <div style={{maxWidth:720,margin:'0 auto'}}>
+          {imageError && <p style={{fontSize:12,color:'#b91c1c',marginBottom:8}}>{imageError}</p>}
           {imagePreview && (
             <div style={{marginBottom:8,position:'relative',display:'inline-block'}}>
               <img src={imagePreview} alt="" style={{height:56,width:56,objectFit:'cover',borderRadius:8,border:'1px solid #e4e4e7'}}/>
-              <button onClick={()=>setImagePreview(null)} style={{position:'absolute',top:-5,right:-5,background:'#18181b',color:'#fff',border:'none',borderRadius:'50%',width:17,height:17,fontSize:9,cursor:'pointer'}}>✕</button>
+              <button onClick={()=>{setImagePreview(null);setImageData(null)}} style={{position:'absolute',top:-5,right:-5,background:'#18181b',color:'#fff',border:'none',borderRadius:'50%',width:17,height:17,fontSize:9,cursor:'pointer'}}>✕</button>
             </div>
           )}
           <div id="inputbox" style={{display:'flex',alignItems:'flex-end',gap:8,background:'#f9f9f9',border:'1.5px solid #e4e4e7',borderRadius:15,padding:'8px 10px',transition:'border-color 0.2s'}} onFocusCapture={e=>e.currentTarget.style.borderColor='#5271ff'} onBlurCapture={e=>e.currentTarget.style.borderColor='#e4e4e7'}>
@@ -173,6 +226,21 @@ function ChatUI() {
         </div>
       </div>
 
+      {inspectionOpen && <div onClick={()=>setInspectionOpen(false)} style={{position:'fixed',inset:0,zIndex:60,background:'#0008',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:18,padding:24,width:'min(650px,95vw)',maxHeight:'80vh',overflowY:'auto'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><h2 style={{fontSize:19}}>WordPress inspection (read-only)</h2><button onClick={()=>setInspectionOpen(false)} style={{border:0,background:'none',cursor:'pointer'}}>✕</button></div>
+          {inspecting ? <p>Inspecting WordPress theme, plugins and content...</p> : inspectionError ? <p style={{color:'#b91c1c'}}>{inspectionError}</p> : inspection ? <>
+            <p><strong>Site:</strong> {inspection.site_title || site?.site_name}</p>
+            <p><strong>Theme:</strong> {typeof inspection.theme==='object' ? inspection.theme?.name : inspection.theme || 'Unknown'}</p>
+            <p><strong>Builder:</strong> {inspection.builder || (inspection.elementor?'Elementor':'Unknown')}</p>
+            <p><strong>Assessment:</strong> {inspection.classification || 'Not classified'} — no changes have been made.</p>
+            <p><strong>Pages:</strong> {inspection.pages?.length ?? 'Unknown'} · <strong>Plugins:</strong> {inspection.plugins?.length ?? 'Unknown'}</p>
+            {inspection.plugins && <details><summary>Installed plugins</summary><ul>{inspection.plugins.map((pl,i)=><li key={i}>{pl.name} {pl.active?'(active)':''}</li>)}</ul></details>}
+            {inspection.pages && <details><summary>Pages</summary><ul>{inspection.pages.map((pg,i)=><li key={i}>{pg.title}</li>)}</ul></details>}
+            <p style={{fontSize:12,color:'#71717a'}}>Existing sites are not automatically modified. Theme/plugin installation requires your approval.</p>
+          </> : null}
+        </div>
+      </div>}
       {/* Upgrade modal */}
       {showUpgrade && (
         <div style={{position:'fixed',inset:0,background:'#000000aa',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
