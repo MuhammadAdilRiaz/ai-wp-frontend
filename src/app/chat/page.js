@@ -12,6 +12,7 @@ function ChatUI() {
   const [messages, setMessages]   = useState([])
   const [input, setInput]         = useState('')
   const [sending, setSending]     = useState(false)
+  const [buildingStatus, setBuildingStatus] = useState('')
   const [credits, setCredits]     = useState(0)
   const [site, setSite]           = useState(null)
   const [loading, setLoading]     = useState(true)
@@ -81,6 +82,7 @@ function ChatUI() {
     if (!token) { redirectToLogin(`/chat?site=${siteId}`); return }
     const userMsg = input.trim()
     setInput(''); setImagePreview(null); setImageData(null); setImageError(''); setSending(true)
+    setBuildingStatus(/\b(build|create|design|redesign|develop|website|store|page|banao|bnado)\b/i.test(userMsg) ? 'Building with Claude · OpenAI preparing copy and visuals · WordPress verifying changes' : 'Processing your request')
     setMessages(p => [...p, { role:'user', text:userMsg, imagePreview }])
     const history = messages.slice(-10).map(m => ({ role:m.role, content:m.text }))
     try {
@@ -88,14 +90,14 @@ function ChatUI() {
       // Keep every message of this conversation in one sidebar thread.
       if (data.session_id) setSessionId(data.session_id)
       setCredits(data.credits_left || 0)
-      setMessages(p => [...p, { role:'assistant', text:data.message, actions:data.actions||[], results:data.action_results||[], credits_used:data.credits_used }])
+      setMessages(p => [...p, { role:'assistant', text:data.message, actions:data.actions||[], approvals:data.approval_required||[], results:data.action_results||[], credits_used:data.credits_used, build_status:data.build_status }])
     } catch(err) {
       // A 401 here means the session really is gone — bounce, don't paste
       // "Error: ..." into the transcript as if the AI said it.
       if (err?.status === 401) { redirectToLogin(`/chat?site=${siteId}`); return }
       if (err?.status === 402) { setShowUpgrade(true) }
       setMessages(p => [...p, { role:'assistant', text: err?.status === 402 ? 'You are out of credits. Please top up to continue.' : `Error: ${err.message}`, actions:[], isError:true }])
-    } finally { setSending(false) }
+    } finally { setSending(false); setBuildingStatus('') }
   }
 
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send() } }
@@ -129,7 +131,7 @@ function ChatUI() {
     try {
       const result = await api.executeConnectorAction(siteId, action)
       setMessages(prev => [...prev, { role:'assistant', text: result.success ? `WordPress confirmed: ${action.action}` : `Action failed: ${result.error || 'Unknown error'}`, actions:[], results:[result] }])
-      if (result.success) setInspection(null)
+      if (result.success) { setInspection(null); setMessages(prev => prev.map(m => ({ ...m, approvals:(m.approvals||[]).filter(a => a.slug !== action.slug || a.action !== action.action), actions:(m.actions||[]).filter(a => a.slug !== action.slug || a.action !== action.action) }))) }
     } catch (err) {
       setMessages(prev => [...prev, { role:'assistant', text:`Action failed: ${err.message}`, isError:true, actions:[] }])
     } finally { setApproving('') }
@@ -180,7 +182,7 @@ function ChatUI() {
                   {msg.results.map((r,j) => <ActionCard key={j} result={r}/>)}
                 </div>
               )}
-              {msg.actions?.filter(a => a && ['install_plugin','activate_plugin','install_theme','activate_theme','delete_page'].includes(a.action)).map((action,j) => {
+              {[...(msg.approvals||[]), ...(msg.actions||[])].filter(a => a && ['install_plugin','activate_plugin','install_theme','activate_theme','delete_page'].includes(a.action)).map((action,j) => {
                 const key = `${i}-${j}`
                 return <div key={key} style={{border:'1px solid #fde68a',background:'#fffbeb',borderRadius:12,padding:12,marginTop:8,fontSize:12,maxWidth:'82%'}}>
                   <strong>Approval required: {action.action.replaceAll('_',' ')}</strong>
@@ -194,7 +196,7 @@ function ChatUI() {
           {sending && (
             <div style={{display:'flex',alignItems:'flex-start'}}>
               <div style={{background:'#fff',border:'1px solid #e4e4e7',borderRadius:'18px 18px 18px 4px',padding:'14px 18px',boxShadow:'0 1px 4px #0000000a'}}>
-                <div style={{display:'flex',gap:5}}><span className="dot"/><span className="dot"/><span className="dot"/></div>
+                <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#52525b'}}><span className="dot"/><span className="dot"/><span className="dot"/>{buildingStatus || 'Working on your request'}</div>
               </div>
             </div>
           )}
@@ -222,7 +224,7 @@ function ChatUI() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
             </button>
           </div>
-          <p style={{fontSize:11,color:'#a1a1aa',textAlign:'center',marginTop:7}}>AI builds directly on your WordPress site · 5 credits per message</p>
+          <p style={{fontSize:11,color:'#a1a1aa',textAlign:'center',marginTop:7}}>Claude handles website builds · OpenAI handles content & assets · Credits depend on usage</p>
         </div>
       </div>
 
@@ -265,7 +267,7 @@ function FmtText({ text, isError }) {
   return (
     <div style={{color:isError?'#ef4444':'inherit'}}>
       {text.split('\n').map((line,i) => (
-        <p key={i} style={{margin:i>0?'4px 0 0':0}} dangerouslySetInnerHTML={{__html:line.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')||'&nbsp;'}}/>
+        <p key={i} style={{margin:i>0?'4px 0 0':0}} children={line || '\u00a0'}/>
       ))}
     </div>
   )

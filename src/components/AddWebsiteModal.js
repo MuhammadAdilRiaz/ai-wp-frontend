@@ -43,7 +43,7 @@ export default function AddWebsiteModal({ onClose, onConnected }) {
         </p>
 
         <div style={{background:'#f5f3ff',padding:12,borderRadius:10,marginBottom:14,fontSize:12,color:'#4338ca'}}>
-          <strong>Manual token connection</strong> — Your existing plugin token still works. <a href="/download" style={{color:'#4338ca',textDecoration:'underline'}}>Download connector plugin</a> if needed. Secure WordPress authorization will be available after the backend supports it.
+          <strong>Manual token connection</strong> — Your existing plugin token still works. <a href="/download" style={{color:'#4338ca',textDecoration:'underline'}}>Download connector plugin</a> if needed. <strong style={{marginLeft:6}}>Secure WordPress authorization — Coming Soon.</strong>
         </div>
         <form onSubmit={handleSubmit}>
           <label style={{ fontSize:12.5, fontWeight:600, color:'#3f3f46', display:'block', marginBottom:6 }}>Website URL</label>
