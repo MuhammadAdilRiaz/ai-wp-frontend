@@ -82,7 +82,7 @@ function ChatUI() {
     if (!token) { redirectToLogin(`/chat?site=${siteId}`); return }
     const userMsg = input.trim()
     setInput(''); setImagePreview(null); setImageData(null); setImageError(''); setSending(true)
-    setBuildingStatus(/\b(build|create|design|redesign|develop|website|store|page|banao|bnado)\b/i.test(userMsg) ? 'Building with Claude · OpenAI preparing copy and visuals · WordPress verifying changes' : 'Processing your request')
+    setBuildingStatus(/\b(build|create|design|redesign|develop|website|store|page|banao|bnado)\b/i.test(userMsg) ? 'Building with OpenAI · WordPress verifying changes' : 'Processing your request')
     setMessages(p => [...p, { role:'user', text:userMsg, imagePreview }])
     const history = messages.slice(-10).map(m => ({ role:m.role, content:m.text }))
     try {
@@ -130,7 +130,7 @@ function ChatUI() {
     setApproving(key)
     try {
       const result = await api.executeConnectorAction(siteId, action)
-      setMessages(prev => [...prev, { role:'assistant', text: result.success ? `WordPress confirmed: ${action.action}` : `Action failed: ${result.error || 'Unknown error'}`, actions:[], results:[result] }])
+      setMessages(prev => [...prev, { role:'assistant', text: result.success ? `WordPress confirmed: ${action.action}. You can now continue your original request.` : `Action failed: ${result.error || 'Unknown error'}`, actions:[], results:[result] }])
       if (result.success) { setInspection(null); setMessages(prev => prev.map(m => ({ ...m, approvals:(m.approvals||[]).filter(a => a.slug !== action.slug || a.action !== action.action), actions:(m.actions||[]).filter(a => a.slug !== action.slug || a.action !== action.action) }))) }
     } catch (err) {
       setMessages(prev => [...prev, { role:'assistant', text:`Action failed: ${err.message}`, isError:true, actions:[] }])
@@ -224,7 +224,7 @@ function ChatUI() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
             </button>
           </div>
-          <p style={{fontSize:11,color:'#a1a1aa',textAlign:'center',marginTop:7}}>Claude handles website builds · OpenAI handles content & assets · Credits depend on usage</p>
+          <p style={{fontSize:11,color:'#a1a1aa',textAlign:'center',marginTop:7}}>OpenAI builds websites and handles content & assets · Credits depend on usage</p>
         </div>
       </div>
 
